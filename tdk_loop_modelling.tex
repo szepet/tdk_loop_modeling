@@ -184,13 +184,14 @@ reports low while still be able to find real bugs.
 Its important to note that another advantage of the static analyzer tools 
 (against test cases) that the analysis happens without executing the source 
 code, so it can be used without the running environment. Moreover, the code 
-coverage of the analysis does not depends on the already written test case set. 
-
+coverage of the analysis does not depends on the already written test case set 
+and even can find bugs which is not covered by test cases e.g. unexpected 
+corner cases on the input variables. 
 
 The LLVM Clang Static Analyzer is a source code analysis tool which aims to 
 find bugs in C,
 C++, and Objective-C programs using - one of the most precise analysis methods 
-- symbolic execution  \cite{King1975} \cite{Hampapuram2005} , i.e. it simulates 
+- symbolic execution  \cite{King1975} \cite{Hampapuram2005}, i.e. it simulates 
 the possible execution paths of the code. During symbolic execution, the 
 program is being interpreted, on a function-by-function basis, without any 
 knowledge about the runtime environment. It builds up and traverses an inner 
@@ -198,10 +199,220 @@ model of the execution paths, called \texttt{ExplodedGraph}, for each analyzed
 function. This method has exponential runtime and space complexity in the 
 number of branches.
 
+
 \section{The Clang Static Analyzer}
 
-The Static Analyzer -- as it is indicated by its name -- build around the Clang 
-compiler \cite{Lattner2008}. An important technical note is that the building 
+\emph{Clang} is an open-source compiler, which is based on the \emph{LLVM} 
+project \cite{lattner:clang}. This is a TODO improving/developing project, 
+supported by various companies including e.g. Google, Apple, Samsung, Ericsson, 
+etc. Moreover it is becoming more and more popular in the circle of compilers. 
+Since Clang is built outstandingly modular, it is not simply a compiler but a 
+complete framework for creating developer tools on C/C++/Objective-C 
+languages. Its API is well documented and the software is well tested due to 
+the wide user base.
+
+
+The Clang Static Analyzer (CSA) -- as it is indicated by its name -- build 
+around the 
+Clang compiler. It is one of the most quickly developing open source static 
+analysis tool. In this section the principles and the relevant implementation 
+details of the CSA will be presented.
+%%%
+\subsection{Symbolic execution}
+The CSA uses the symbolic execution static analysis algorithm which means it 
+simulates the possible execution paths and tries make conclusions. It basically 
+interprets the source code but instead of using the actual semantics, it 
+defines an abstract one and models the state according to the defined one.
+
+Unknown values is represented by symbols/symbolic values. The CSA makes 
+constraints on these symbolic values during the analysis of the different 
+paths. Among others, these constraints came from the condition on which a path 
+may bifurcate. There is a constraint solver module in the analyzer which 
+handles these and tries to deduce the conflicts (exclude the non-feasible 
+paths). This is important since a bug found on a non-feasible path is 
+considered as a false positive. The analysis stops if all of the execution 
+paths are simulated and checked or it reaches a predefined limit.
+
+The memory is represented by a hierarchic memory region system 
+\cite{clang:memmodel}, the correspondence between symbolic values and memory 
+regions is tracked. The state of a given program point contains this relation 
+of bindings as well.
+
+\begin{figure}[h]
+	\centering
+	\frame{\includegraphics[width=1\textwidth]{img/utvonalak}}
+	\caption{The different execution paths of a simple function}
+	\label{fig:exec_path}
+\end{figure}
+
+
+
+A végrehajtási útvonalak elemzése tetszőleges sorrendben történhet,
+viszont egy útvonalon belül a kifejezések kiértékelési sorrendje a nyelv
+szabályainak megfelelően történik.
+A kifejezések kiértékelése közben a program állapotait ábrázoljuk, egy kifejezés
+vagy utasítás eredménye egy átmenetet fog előidézni a program szimbolikus
+állapotai közt. Egy szimbolikus állapotot programállapotok halmazaként
+értelmezhetünk. Tehát egy útvonal az elemzés számára nem más, mint a program
+különböző szimbolikus állapotainak jól meghatározott sorrendben történő
+vizsgálata.
+
+Ennek érdekében, egy ezt a célt tökéletesen szolgáló modell, úgynevezett
+\textbf{Exploded Graph} \cite{explodedgraph} kerül felépítésre az elemzés alatt.
+Az Exploded Graph csúcsai párok, amik egy szimbolikus
+\textit{programállapotból} és egy \textit{programpontból} állnak.
+A programpont határozza meg azt, hogy a program mely pontján tart éppen az
+elemzés. Két csúcs közötti irányított él pedig a sorrendiséget határozza meg.
+
+Amennyiben egy elágazáshoz érünk a szimbolikus végrehajtás során, úgy az 
+Exploded Graph elágazik (lásd
+\ref{fig:exploded_graph}.ábra). Íly módon a rákövetkező csúcsok száma
+(és ebből következően a gráf mérete) az elemzés alatt - az elágazások számában -
+exponenciális mértékben nő.
+Ezen ok miatt egy komplex és precíz, ám időigényes módszerről beszélünk.
+
+Az Exploded Graph egy egyszerű körmentes irányított gráf. Amikor egy olyan 
+programpont és szimbolikus
+állapot párhoz jut el az elemzés, amit már korábban meglátogattunk, az elemzés
+az adott útvonalon véget ér, hiszen onnantól ugyanazokat a
+következtetéseket vonná le a determinisztikus elemzőmotor, amit a legutóbbi 
+végrehajtási útvonal során is levont.
+Vegyük észre, hogy míg programállapotok
+esetében ehhez hasonló helyzet végtelen ciklust jelentene, itt nincsen erről 
+szó,
+hiszen egy szimbolikus programállapotra valódi programállapotok halmazaként is 
+tekinthetünk, tehát az,
+hogy egy programpontban kétszer látunk azonos szimbolikus állapotot, nem 
+jelenti azt, hogy kétszer előfordulna ugyanaz a valódi programállapot.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1\textwidth]{img/explodedgraph.eps}
+	\caption{The corresponding Exploded Graph to the function presented on Fig 
+	\ref{fig:exec_path}. The constraints made on the symbolic values are shown 
+	next to the Exploded Nodes it belongs.}
+	\label{fig:exploded_graph}
+\end{figure}
+
+A gyakorlatban az Exploded Graphot felépítő program állapotokat nem csak a
+program futása során ténylegesen előforduló állapotok alkotják. A CSA
+elemzőrendszer időnként eltávolítja a már szükségtelenné, fölöslegessé váló
+szimbolikus értékeket. Ezek a \textit{takarítások} is egy újabb élt és újabb
+programállapotot (csúcsot) eredményeznek.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=0.7\textwidth]{img/eg}
+	\caption{A small part of the actual Exploded Graph built by the Clang 
+	Static Analyzer for the function shown on Fig \ref{fig:exec_path}.}
+	\label{fig:exploded_graph2}
+\end{figure}
+
+A modell tulajdonságai alapján kijelenthetjük, hogy a szimbolikus végrehajtás
+egy \textbf{útvonal érzékeny algoritmus}, vagyis bármely programállapotot elérve
+ismerjük az oda vezető teljes végrehajtási útvonalat. Ezáltal a hibák 
+megjelenítése
+során a hozzájuk tartozó útvonal is a kimenet részét képzi. Ez jelentős
+mértékben segít a hiba megértésében és csökkenti az annak kijavítására szánt
+időt.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1\textwidth]{img/view}
+	\caption{A CSA által talált hiba megtekintése HTML formátumban.}
+	\label{fig:hibak_megjelenitese}
+\end{figure}
+
+\subsection{Implementációs részletek}
+\subsubsection{Az elemzés folyamata}
+Egy fordítási egység elemzése során az azt alkotó függvények kerülnek
+szimulálásra. Tehát a felépített modell is egy függvényhez tartozik,
+annak végrehajtása során előforduló programállapotok alkotják az Exploded 
+Graphot. 
+
+Adott útvonal vizsgálata során elágazás fordulhat elő, ekkor az Exploded 
+Graphot szintén elágaztatjuk,
+és az elágazást okozó feltétel teljesülését, illetve tagadását feljegyezzük a 
+megfelelő csúcsokban.
+Ezzel információt szerezünk az éppen elemzett útvonalról.
+
+Adott függvény szimulációja során gyakran előfordul, hogy egy másik függvény 
+hívásához jutunk valamely útvonalon.
+Ekkor a hívott függvény a hívás helyén kielemzésre kerül a CSA által.
+A különbség az eredeti függvény szimulációjához képest, hogy már potenciálisan 
+van információnk a hívott függvény argumentumainak lehetséges értékeiről.
+Az adott útvonalon tett megszorítások figyelembe vételével egy, a hívott 
+függvény \textit{sima} elemzésénél több információval rendelkező elemzést 
+hajthatunl végre.
+A több információt pedig a hívási kontextusból származó ismeretek jelentik.
+A függvények ilyen módon (hívási információ ismeretében) történő elemzését 
+\textit{inline} elemzésnek nevezzük.
+A minden kezdetleges információ nélküli elemzést \textit{top level} 
+vizsgálatnak nevezzük.
+
+A fals pozitív találatok csökkentése és a gyorsabb elemzés érdekében a CSA nem 
+elemez top levelként egy függvényt,
+amennyiben az már korábban \textit{inline módon elemezve} (továbbiakban: 
+inlineosítva) lett. Ez egy fontos 
+heurisztika, aminek a fordítási egységek közti elemzésre való általánosítása 
+nem egyszerű probléma, amivel
+a dolgozatom jelentős részében foglalkozom.
+
+\subsubsection{A modell felépítése}
+A szimulációhoz szükséges a különböző változók, függvények, típusok 
+szintaktikus és szemantikus tulajdonságainak ismerete.
+Ezen információk a C/C++ forrásfájlok esetén a fordítás során is szükségesek.
+A fordítók ezeket egy saját, jól struktúrált adatszerkezetben tárolják, egy 
+absztrakt szintaxisfát építenek fel a kód elemzése során.
+A gyakorlatban ez konkrét (adott platformra jellemző) információkat, illetve a 
+szemantikus tulajdonságokat is tartalmazza.
+Sőt, számos fordító esetében kör is előfordulhat benne. Ilyenkor csupán csak 
+történeti okokból hívják az adott adatszerkezetet fának.
+A felsorolt tulajdonságok alapján ez az adatszerkezet a szimbolikus végrehajtás 
+számára nélkülözhetetlen információkat tartalmaz. 
+Ebben rejlik a fő motivációja annak, hogy egy statikus elemző rendszert egy 
+fordító köré építsünk,
+amely képes az alapvetően szükséges információk strukturált előállítására. 
+Fontos még, hogy az adatszerkezetben
+tárolt információk helyessége jól tesztelt, hiszen minden fordítás során a 
+kódgeneráláskor ugyanezek az
+információk lesznek felhasználva. A CSA a Clang fordító által épített 
+szintaxisfát használja.
+
+Ezek után már elegendő információ áll rendelkezésre az elemző rendszer számára,
+hogy (pár köztes lépésen keresztül) képes legyen felépíteni a szimulálás során 
+létrejövő Exploded Graphot.
+
+Az elemzés során használt modellt (az Exploded Graphot) a CSA egy
+optimalizált \textit{mélységi bejárás} segítségével építi fel és járja be 
+egyszerre.
+Ennek fő oka, hogy a mélységi bejáráshoz elegendő csak az adott útvonalhoz
+tartozó csúcsok memóriában tartása. Ezzel szemben egy szélességi bejárás során
+az összes elemzett útvonalat a memóriában kell tartanunk az útvonalérzékenység
+megtartása érdekében. Továbbá a mélységi bejárás esetén kevesebb kontextus 
+váltásra van
+szükség: az adott útvonal elemzése során kevés memóriarégió és szimbólum kerül
+felhasználásra, nagyobb eséllyel találhatóak meg a felhasznált adatszerkezetek a
+processzor gyorsítótárában, így hatékonyabban tudjuk végrehajtani az 
+elemzést.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1\textwidth]{img/memoria.eps}
+	\caption{The different traverses of the Exploded Graph and the parts which 
+	needs to be stored in the memory (black). Depth first search (left) and 
+	breath first search (right).}
+	\label{fig:bejaras_szemleltetes}
+\end{figure}
+
+Mindezeken túlmenően a memóriahasználat csökkentése céljából bizonyos
+időközönként a jelenleg memóriában tartott \textit{fölösleges} csúcsok
+eltávolításra kerülnek. Ez elsősorban a CSA által létrehozott, annak belső
+müködését segítő, de a program futása során konkrétan nem megjelenő
+állapotokat érinti.
+
+%%%%
+An important technical note is that the building 
 of the \texttt{ExplodedGraph} is based on the \texttt{Control Flow Graph} 
 (\texttt{CFG}) of the functions. The \texttt{CFG} represents a source-level, 
 intra-procedural control flow of a 
@@ -248,17 +459,18 @@ These limitations include:
 	\item The number of times a basic block is processed during the 
 	analysis. This	constraint limits the number of loop iterations. When this 
 	threshold is reached the currently analyzed execution path is aborted.
-	The budget expression can be used in two ways. Sometimes it means the
-	collection of the limitations above, sometimes it refers to one of these
-	limitations. This will always be distinguishable from the context.
 \end{enumerate}
 
+
+The budget expression can be used in two ways. Sometimes it means the
+collection of the limitations above, sometimes it refers to one of these
+limitations. This will always be distinguishable from the context.
 
 \section{Motivation}
 Currently, the analyzer handles loops quite simply. More precisely, it unrolls 
 them 4 times by default and then cuts the analysis of the path where the loop 
 would have been unrolled more than 4 times. This behavior is reached by the 
-above presented basic block visiting budget.
+above presented basic block visiting budget (restriction no. 4).
 
 Loss in code coverage is one of the problems with this approach to loop
 modeling. Specifically, in cases where the loop is statically known to make 
@@ -320,8 +532,10 @@ short according to the budget rule.
 Even though the analyzer generates paths to simulate the code after the loop 
 in the above described case, the value of variable \texttt{n} will be 
 always less than 4 on these paths and the rest of the function will only be 
-checked assuming this constraint. This can result in coverage loss as well, 
-since the analyzer will ignore the paths where n is more than 4.
+checked assuming this constraint. Since the analysis did not had any 
+precondition on the possible values of the variables, this constraint not 
+necessary correct. Most of the time this method results in coverage loss as 
+well, since the analyzer will ignore the paths where n is more than 4.
 
 \section{Proposed Solution}
 %The current loop handling method in the Clang Static Analyzer is too 
