@@ -88,6 +88,13 @@ title=\lstname                   % show the filename of files included with
 
 % belső fedőlap
 \include{tex/top_page}
+\include{tex/introduction}
+\include{tex/motivation}
+\include{tex/solution}
+\include{tex/evaluation}
+\include{tex/conclusion}
+\include{tex/future}
+\include{tex/acknowledgement}
 \cleardoublepage
 
 % tartalomjegyzék
@@ -203,7 +210,7 @@ number of branches.
 \section{The Clang Static Analyzer}
 
 \emph{Clang} is an open-source compiler, which is based on the \emph{LLVM} 
-project \cite{lattner:clang}. This is a TODO improving/developing project, 
+project \cite{lattner:clang}. This is a quickly improving project, 
 supported by various companies including e.g. Google, Apple, Samsung, Ericsson, 
 etc. Moreover it is becoming more and more popular in the circle of compilers. 
 Since Clang is built outstandingly modular, it is not simply a compiler but a 
@@ -213,10 +220,9 @@ the wide user base.
 
 
 The Clang Static Analyzer (CSA) -- as it is indicated by its name -- build 
-around the 
-Clang compiler. It is one of the most quickly developing open source static 
-analysis tool. In this section the principles and the relevant implementation 
-details of the CSA will be presented.
+around the Clang compiler. It is one of the most quickly developing open source 
+static analysis tool. In this section the principles and the relevant 
+implementation details of the CSA will be presented.
 %%%
 \subsection{Symbolic execution}
 The CSA uses the symbolic execution static analysis algorithm which means it 
@@ -245,54 +251,65 @@ of bindings as well.
 	\label{fig:exec_path}
 \end{figure}
 
-The analysis of the different execution paths can be done in any order, however, the evaluation of an expression (on a given path) must happen according to the language standard. 
-During the simulation of the expressions the analyzer models the state of the program, means that one expression/instruction will create a transition between two states. A symbolic state can be viewed as a set of concrete program states, moreover, a simulated path is basically ab analysis of these symbolic states in a well defined order. 
+The analysis of the different execution paths can be done in any order, 
+however, the evaluation of an expression (on a given path) must happen 
+according to the language standard.  
+During the simulation of the expressions the analyzer models the state of the 
+program, means that one expression/instruction will create a transition between 
+two states. A symbolic state can be viewed as a set of concrete program states, 
+moreover, a simulated path is basically ab analysis of these symbolic states in 
+a well defined order. 
 
-In order to be able to perform this process efficiently, the analyzer creates an inner model of the execution paths, called ExplodedGraph \cite{explodedgraph}. The nodes of the ExplodedGraph (called ExplodedNodes) are pairs, containing a symbolic program state and a program point. The program point determines the code location where the symbolic execution is in the source text. The directed edge between ExplodedNodes determines the sequencing.
+In order to be able to perform this process efficiently, the analyzer creates 
+an inner model of the execution paths, called ExplodedGraph 
+\cite{explodedgraph}. The nodes of the ExplodedGraph (called ExplodedNodes) are 
+pairs, containing a symbolic program state and a program point. The program 
+point determines the code location where the symbolic execution is in the 
+source text. The directed edge between ExplodedNodes determines the sequencing.
 
-Whenever the CSA encounters a branch in the symbolic execution, it creates new branches in the ExplodedGraph (see Fig \ref{fig:exploded_graph}). The paths from the root to the leaves represents the analyzed paths. This means, that the number of leaves in the ExplodedGraph (and so the size of the graph) is exponential with respect to the branches in the execution. That results us a complex, precise but resource consuming method.
+Whenever the CSA encounters a branch in the symbolic execution, it creates new 
+branches in the ExplodedGraph (see Fig \ref{fig:exploded_graph}). The paths
+from the root to the leaves represents the analyzed paths. This means, that the 
+number of leaves in the ExplodedGraph (and so the size of the graph) is 
+exponential with respect to the branches in the execution. That results us a 
+complex, precise but resource consuming method.
 
-
-The ExplodedGraph is a simple directed acyclic graph.
-Az Exploded Graph egy egyszerű körmentes irányított gráf. Amikor egy olyan 
-programpont és szimbolikus
-állapot párhoz jut el az elemzés, amit már korábban meglátogattunk, az elemzés
-az adott útvonalon véget ér, hiszen onnantól ugyanazokat a
-következtetéseket vonná le a determinisztikus elemzőmotor, amit a legutóbbi 
-végrehajtási útvonal során is levont.
-Vegyük észre, hogy míg programállapotok
-esetében ehhez hasonló helyzet végtelen ciklust jelentene, itt nincsen erről 
-szó,
-hiszen egy szimbolikus programállapotra valódi programállapotok halmazaként is 
-tekinthetünk, tehát az,
-hogy egy programpontban kétszer látunk azonos szimbolikus állapotot, nem 
-jelenti azt, hogy kétszer előfordulna ugyanaz a valódi programállapot.
+The ExplodedGraph is a simple directed acyclic graph. Whenever the analysis 
+reachesan ExplodedNode which was already visited before, then the simulation 
+will be stopped since the CSA would do the same (deterministic) reasoning what 
+was already done. Note, that in case of concrete program states this would lead 
+to an infinite loop, on the symbolic level this does not stand, since a
+symbolic program state represents a set of real program states.
 
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=1\textwidth]{img/explodedgraph.eps}
-	\caption{The corresponding Exploded Graph to the function presented on Fig 
-	\ref{fig:exec_path}. The constraints made on the symbolic values are shown 
-	next to the Exploded Nodes it belongs.}
+	\caption{The corresponding ExplodedGraph to the function presented on Fig 
+		\ref{fig:exec_path}. The constraints made on the symbolic values are 
+		shown next to the ExplodedNodes it belongs.}
 	\label{fig:exploded_graph}
 \end{figure}
 
-A gyakorlatban az Exploded Graphot felépítő program állapotokat nem csak a
-program futása során ténylegesen előforduló állapotok alkotják. A CSA
-elemzőrendszer időnként eltávolítja a már szükségtelenné, fölöslegessé váló
-szimbolikus értékeket. Ezek a \textit{takarítások} is egy újabb élt és újabb
-programállapotot (csúcsot) eredményeznek.
+In practice, the CSA constructs ExplodedNodes which does not represent any 
+concrete transition between nodes but just help the simulation e.g. at some 
+points the analyzer cleans up the stored but not necessary symbols and so it 
+introduces a new node in order to smoothly fit this procedure into the flow of 
+the analysis.
 
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=0.7\textwidth]{img/eg}
-	\caption{A small part of the actual Exploded Graph built by the Clang 
+	\caption{A small part of the actual ExplodedGraph built by the Clang 
 	Static Analyzer for the function shown on Fig \ref{fig:exec_path}.}
 	\label{fig:exploded_graph2}
 \end{figure}
 
-
-According to the properties of the model, it can be declared, that the symbolic execution is a path sensitive algorithm, i.e. reaching any program state the CSA knows the whole path leading to the simulated point. Thereby the displaying of the bugs shows not only the location of the bug but the corresponding execution path as well. This productively helps the programmer to understand the problem more easily, even spending less time on fixing the bug.
+According to the properties of the model, it can be declared, that the symbolic 
+execution is a path sensitive algorithm, i.e. reaching any program state the 
+CSA knows the whole path leading to the simulated point. Thereby the displaying 
+of the bugs shows not only the location of the bug but the corresponding 
+execution path as well. This productively helps the programmer to understand 
+the problem more easily, even spending less time on fixing the bug.
 
 \begin{figure}[h]
 	\centering
@@ -946,7 +963,11 @@ infinite loops.
 I would like to thank Laszlo Makk and the members of the \texttt{CodeChecker} 
 team at Ericsson for their valuable and helpful suggestions on the paper. 
 
-This study was supported by the \'UNKP-17-2 New National Excellence Program of the Hungarian Ministry of Human Capacities.
+This study was supported by the \'UNKP-17-2 New National Excellence Program of 
+the Hungarian Ministry of Human Capacities.
+\begin{center}
+	\includegraphics[scale=0.2]{img/unkp}\\
+\end{center}
 
 % The 'abbrvnat' bibliography style is recommended.
 
