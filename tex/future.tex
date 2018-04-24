@@ -1,0 +1,20 @@
+
+\section{Future work}
+The heuristic patterns for completely unrolled loops could be extended to 
+involve loops whose bound is a known variable which is not changed in the body. 
+Furthermore, even more general rules would be beneficial: consider loops where  
+the value variables are known at the beginning and they are affected by a known 
+constant change by every iteration. These improvements have not been implemented
+yet due to some technical and framework limitations.
+
+During the widening process we invalidate any possibly changed information. 
+However, a change made on a pointer could mean that we need to 
+invalidate all variables due to the lack of advanced pointer analysis. Therefore, 
+introducing pointer analysis algorithms to the analyzer could help to develop a 
+more precise invalidation process.
+
+The infrastructural improvements enable the analyzer to provide entry points 
+for bug finding modules (checkers) on loop entrances/exits and identify the 
+currently simulated loop for every \texttt{ExplodedNode}. On top of these entry 
+points new checkers can be implemented e.g. a check for finding possible 
+infinite loops.

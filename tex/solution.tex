@@ -1,0 +1,197 @@
+
+\section{Proposed Solution}
+%The current loop handling method in the Clang Static Analyzer is too 
+%strict.
+In this section two solutions are presented to resolve the above mentioned
+limitations on symbolic execution of loops in the Clang Static Analyzer. It 
+is important to note that these enhancements are incremental in the sense 
+that the original method is brought back on examples which are too complex to handle at the moment. For the sake of simplicity a 
+"division by zero" will illustrate the bug we intend to find in the following examples.
+
+\subsection{Loop Unrolling Heuristics}
+Loop unrolling means we have identified heuristics and patterns (such as 
+loops
+with small number of branches and small known static bound) in order to find
+specific loops which are worth to be completely unrolled. This idea is 
+inspired by the following example:
+
+\lstset{language=C++,caption={Complete unrolling of the loop makes it possible 
+to find the division by zero error.},label=UnrollEx}
+\begin{lstlisting}
+void foo() {
+  for (int i = 0; i < 6; i++) {
+    /*simple loop which does not
+    change 'i' or split the state*/
+  }
+  int k = 0;
+  int l = 2/k; // Division by zero
+}\end{lstlisting}
+
+In the current solution a loop has to fulfill the following conditions in order 
+to be unrolled:
+\begin{enumerate}  
+	\item The loop condition should arithmetically compare a variable -- 
+	which is known at the beginning of the loop -- to a literal (like: 				\texttt{i~<~6} or \texttt{6~$\ge$~i})
+	\item The loop should change the loop variable only once in its body 
+	and the	difference needs to be constant. (This way the maximum number of 
+	steps can be estimated.)
+    \item There is no alias created to the loop variable.
+	\item The estimated number of steps should be less than 128. (Simulating 
+	loops which takes thousands of steps because they could single handedly 
+	exhaust the budget.)
+	\item The loop must not generate new branches or use \texttt{goto} 
+	statements.
+\end{enumerate}
+
+By using this method, the bug on the Listing \ref{UnrollEx} example can be 
+found successfully.
+
+\subsection{Loop Widening}
+The final aim of widening is quite the same as the unrolling, to increase 
+the coverage of the analysis. However, it reaches it in a very different way. 
+During widening the analyzer simulates the execution of an arbitrary number 
+of iterations. The analyzer already has a widening algorithm which reaches 
+this behavior by discarding all of the known information before the last step 
+of the loop. So the analyzer creates the paths for the first 3 steps and 
+simulate them as usual, but in order to avoid losing the first precise simulation branches, the widening (means the invalidating) happens 
+before the 4th step. 
+This way the coverage will be increased, however, this method is disabled by 
+default, since it can easily result in too much false positives. Consider the 
+example on Listing \ref{WidenProb}.
+\\
+
+\lstset{language=C++,caption={Invalidating every known information (even 
+those which are not modified by the loop) can easily result in false 	
+positives.},label=WidenProb}
+\begin{lstlisting}
+int num();
+void foo() {
+  bool b = true;
+  for (int i = 0; i < num(); ++i) {
+    /*does not changes 'b'*/
+  }
+  int n = 0;
+  if (b)
+    n++;
+  n = 1/n; // False positive:
+           // Division by zero
+}\end{lstlisting}
+In this case the analyzer will create and check that unfeasible path where 
+the variable \texttt{b} is false, so \texttt{n} is not incremented and lead 
+into a division by zero error. Since this execution path would never be 
+performed while running the analyzed program, it is considered a false positive. My aim 
+was to give a more precise approach for widening. There was already conversation within the community about some possible enhancements \cite{Widening}.
+
+One of the main principles is that the analysis should still continue after the block 
+visiting budget is exhausted and the information of only those variables should be invalidated which are possibly modified by the loop, e.g. a statement, like \texttt{arr[i] = i} where \texttt{i} is the loop variable, means that we discard the data on the whole \texttt{arr} array but nothing else).
+For this I developed a solution which checks every possible way in which a 
+variable can be modified in the loop. Then these cases are evaluated and if it 
+encounters a modified variable which cannot be handled by the invalidation 
+process (e.g.: a pointer variable), then the loop will not be widened and we
+return to the conservative method. This mechanism ensures that we do not create 
+nodes that contain invalid states.
+This approach helps us to cover cases and find bugs like the one illustrated on 
+Listing \ref{WidenEx} without reporting false positives  
+presented on Listing \ref{WidenProb}.
+
+\lstset{language=C++,caption={Invalidating the information on only the possible 
+changed variables can result higher coverage (while limiting the number of the 
+found false positives).}, label=WidenEx}
+\begin{lstlisting}
+int num();
+void foo() {
+  int n = 0;
+  for (int i = 0; i < num(); ++i) {
+    ++n;
+  }
+  if (n > 4) {
+    int k = 0;
+    k = 1/k;  // Division by zero error
+  }
+}\end{lstlisting}
+
+The bug is found by invalidating the known information on variable
+\texttt{n} (and \texttt{i} as well). This makes the analyzer to create a 
+branch
+where it checks the body of the \texttt{if} statement and finds the bug.
+However, this solution has its own limitations when dealing with nested 
+loops. 
+Consider the case on Listing \ref{WidenEx2}.
+\lstset{language=C++,caption={The naive widening method does not handle 
+well the nested loops. In this example the outer loop will not be widened.},label=WidenEx2}
+\begin{lstlisting}
+int num();
+void foo() {
+  int n = 0;
+  for (int i = 0; i < num(); ++i) {
+    ++n;
+    for (int j = 0; j < 4; ++j) {
+      /*body that does not change n*/
+    }
+  }
+  /*rest of the function, n <= 1 */
+}\end{lstlisting}
+
+In this scenario, when the analyzer first step into the outer loop (so it assumes
+that \texttt{i < num()} is true) and encounter the inner loop, it consumes
+its (own) block visiting budget. (This implies that it will be widened, although
+in this case it means that only the inner loop counter (\texttt{j}) information
+is discarded.) After moving on to the next iteration, we may assume that we
+are on the path where the outer loop condition is true again. Due to the fact that the budget was already exhausted in the previous iteration, the next visit of the first
+basic block of the inner loop (the condition) means that this path will be
+completely cut off and not analyzed. This results in the outer loop not reaching the step number where it would been widened. Furthermore, the outer loop
+will not even reach the 3rd step, even the 2nd is stopped at in its body
+(as described above). This causes the problem that even though the 
+loop widening method is used, the rest of the function will be analyzed by the 
+assumption \texttt{n <= 1}.
+
+In order to deal with the above described nested loop problem, I have 
+implemented a replay mechanism. This means that whenever we encounter an inner 
+loop which already consumed its budget, we replay the analysis process of the 
+current step of the outer loop after performing a widening first. This ensures
+the creation of a path which assumes that the condition is false and simulates 
+the execution after the loop while the possibly changed information are 
+discarded. This way the analyzer will not exclude some feasible path 
+because of the simple loop handling which solves the problem.
+
+An additional note to the widening process is that it makes sense to analyze the branch 
+where the condition is true with the widened State as well. The example on 
+Listing \ref{WidenNested} shows a case where this is useful.
+\\
+\\
+\lstset{language=C++,caption={The replay mechanism successfully helps us to 
+		find the possible error the outer loop.},label=WidenNested}
+\begin{lstlisting}
+int num();
+void foo() {
+  int n = 0;
+  int i;
+  for (i = 0; i < num(); ++i) {
+    if (i == 7) {
+      break;
+    }
+    for (int j = 0; j < 4; ++j) {/* */}
+  }
+  int n = 1 / (7 - k);
+         // ^ Possible division by zero
+}\end{lstlisting}
+This way the analyzer will produce a path where the value of \texttt{i} is 
+known
+to be 7, so it will be able find the possible division by zero error.
+	
+\subsection{Infrastructure improvements}\label{sec:inf}
+The discussed approaches heavily rely on the fact that we are able to 
+perform the following actions:
+\begin{enumerate}
+	\item Decide on any \texttt{ExplodedNode} whether it simulates a body of a 
+	loop or not,
+	\item Recognize the entering and exiting point of a loop on the simulated 
+	path.
+\end{enumerate}
+
+However, this information was not provided by the analyzer earlier. Considering the 
+lexical nature of the loops, their entrance and exit points can unambiguously 
+fit into the \texttt{CFG}. 
+
+The \texttt{ProgramPoint} provides the \texttt{LocationContext} which implements a stack data structure for having the information on the different locations of the code.  This implies that the callstack can be represented via this structure in a straightforward manner (and is contained by the \texttt{LocationContext}).
+Since storing the currently simulated loops fits into a stack data structure as well, this information -- called \texttt{LoopContext} -- understandably was implemented as the part of the \texttt{LocationContext} too instead of having them in the \texttt{Store}. Both the \texttt{Store} and the \texttt{LocationContext} are part of an \texttt{ExplodedNode} in form of a pointer. However, these structures use copy-on-write semantics, and the \texttt{LocationContext} changes way less times, this decision saves us memory. 

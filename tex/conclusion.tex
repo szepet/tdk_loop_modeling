@@ -1,0 +1,16 @@
+
+\section{Conclusion}
+
+Two alternative approaches was introduced for improving the simulation of loops during symbolic 
+execution. These were implemented and subsequently evaluated on various open 
+source projects, with a clear improvement of code coverage in general. The new methods make it possible to explore previously skipped, feasible execution paths, especially when both of them are used in conjunction.
+
+The required changes done to the underlying infrastructure should also ease the 
+implementation of future enhancements. In particular, information tracked by the 
+analysis about location contexts were expanded with additional fields.
+While code coverage was measured to have increased by an average of 0.8\% and the 
+number of explored execution paths by an average of 16\%, there 
+was a noticeable performance penalty as well. A general increase in the runtime was observed, with an average of 9.5\% . The number of simulated paths also increased proportionally with the time taken, suggesting this time was well 
+spent. In conclusion, if the user does not mind taking $\sim$10\% more time
+for a more comprehensive analysis, then it is beneficial to enable the proposed
+feature set by default. 

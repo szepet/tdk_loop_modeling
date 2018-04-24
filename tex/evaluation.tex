@@ -1,0 +1,198 @@
+
+\section{Evaluation}
+
+The effect of the described loop modeling approaches was measured on various 
+C/C++ open source projects. These are listed on Table \ref{tab:lines}.
+
+\begin{table}[!htb]
+	\centering
+\begin{tabular}{ |c||c|c| }
+	\hline
+	Project & LoC & Language \\
+	\hline
+	TinyXML & 20k & C++ \\
+	\hline
+	Curl & 21k & C  \\ 
+	\hline
+	Redis & 40k & C \\ 
+	\hline
+	Xerces & 228k & C++ \\ 
+	\hline
+	Vim & 540k & C \\ 
+	\hline
+	OpenSSL & 550k & C  \\ 
+	\hline
+	PostgreSQL & 950k & C \\ 
+	\hline
+	FFmpeg & 1080k & C \\	
+	\hline
+\end{tabular}
+\caption{The projects used for profiling, their length in code lines, and 
+language.}\label{tab:lines}
+\end{table}
+
+\subsection{Coverage and the number of explored paths}
+Keeping track of these statisics are already part of the analyzer. The 
+coverage percentage is based on the ratio of the visited and the total number 
+of basic blocks in the analyzed functions (instead of the number of visited statements),
+which results in a small imprecision. 
+It is important to note that the introduced loop modeling methods require having 
+additional loop entrance and exit point information (described in section 
+\ref{sec:inf}) in the \texttt{CFG}. This can lead to having more 
+basic blocks in the \texttt{CFG} and it can affect the statistics. As a result, 
+even statistics produced by using the current loop modeling 
+approach were measured with this information added to the \texttt{CFG}.
+
+The coverage and the number of explored paths are generated for every 
+translation unit and then summarized. This means that header files which 
+are included in more than one translation unit can influence more statistics.
+However, by using this summarization process consistently for every measurement 
+the results reflect the reality. 
+
+The tables presented in this section summarize measurement results using 
+different loop modeling approaches: the current practice (denoted by Normal)
+and the hereby introduced loop unrolling (Unroll) and loop widening (Widen)
+methods separately and simultaneously (U+W).
+
+\begin{table}[!htb]
+	\centering
+\begin{tabular}{ |c||c|c|c|c| } 
+	\hline
+	Project & Normal & Unroll & Widen & U + W \\
+	\hline \hline
+	TinyXML & 84.2 & 84.2 & 85.1 & 85.1 \\ 
+	\hline
+	Curl & 76.2 & 76.9 & 77.7 & 77.2 \\ 
+	\hline
+	Redis & 68.5 & 69.1 & 68.5 & 71.3 \\ 
+	\hline
+	Xerces & 92.3 & 92.4 & 92.7 & 92.7 \\ 
+	\hline
+	Vim & 60.4 & 60.6 &	60.6 & 60.7 \\ 
+	\hline
+	OpenSSL & 97.4 & 97.5 & 97.7 & 97.7 \\ 
+	\hline
+	PostgreSQL & 76.9 &	77.0 & 76.9 & 76.9 \\ 
+	\hline
+	FFmpeg & 86.1 & 86.3 & 87.0 & 86.8 \\	
+	\hline
+\end{tabular}
+\caption{The code coverage of the analysis on the evaluated projects expressed 
+in percentage.}\label{tab:cov}
+\end{table}
+
+Table \ref{tab:cov} shows the coverage difference using the introduced 
+approaches. On most of the projects, analysis coverage was strictly increased by
+using any of the proposed approaches. The widening method had a stronger 
+influence on the coverage in the average case. However, the complete unroll of 
+specific loops could result in a higher coverage as well (e.g. Curl, Redis).
+In general, enabling both of them was the most beneficial with respect to the 
+coverage.
+
+\begin{table}[!htb]
+	\centering
+\begin{tabular}{ |c||r|r|r|r| } 
+	\hline
+	Project & Normal & Unroll & Widen & U + W \\
+	\hline \hline
+	TinyXML & 14\,452 & 15\,460 & 14\,765 & 15\,773 \\ 
+	\hline
+	Curl & 18\,272 & 18\,577 & 28\,835 & 24\,279 \\
+	\hline
+	Redis & 69\,857 & 70\,097 & 98\,446 & 100\,929 \\ 
+	\hline
+	Xerces & 395\,615 & 398\,077 & 430\,989 & 433\,358 \\ 
+	\hline
+	Vim & 155\,451 & 157\,266 & 188\,136 & 173\,121 \\ 
+	\hline
+	OpenSSL & 687\,175 & 687\,932 & 700\,464 & 701\,013 \\ 
+	\hline
+	PostgreSQL & 382\,660 & 383\,874 & 453\,188 & 419\,118  \\ 
+	\hline
+	FFmpeg & 466\,613 & 458\,480 & 571\,399 & 521\,725  \\ 		
+	\hline
+\end{tabular}
+\caption{The numbers of explored execution paths using different loop modeling
+approaches.}\label{tab:pathnum}
+\end{table}
+Table \ref{tab:pathnum} presents the numbers of analyzed execution paths.
+As expected, both introduced loop modeling methods resulted in a higher number of
+simulated paths on (almost) all of the projects. The only exception is the unrolling 
+approach on the FFmpeg project, which caused the budget limiting the number of 
+traversed \texttt{ExplodedNode}s to exhaust earlier, slightly decreasing 
+the number of checked paths. Enabling both of the features resulted in similar or 
+fewer number of explored paths than the runs using only widening. 
+This effect can be explained in two ways:   
+\begin{enumerate*} [label={(\arabic*)}, noitemsep]
+	\item the analyzer prefers to completely unroll loops rather than widen them, 
+    which results in a more precise modeling of the state and can exclude unfeasible 
+    paths,
+	\item the simultaneous use of the methods can lead to exhausting the budget on earlier paths, where the analysis will be terminated.
+\end{enumerate*}
+
+\subsection{Found bugs}
+\begin{table}[!htb]
+	\centering
+\begin{tabular}{ |c||c|c|c|c| } 
+	\hline
+	Project & Normal & Unroll & Widen & U + W \\
+	\hline \hline
+	TinyXML & 1 & 1 & 3 & 3 (+200\%) \\
+	\hline
+	Curl & 16 & 16 & 16 & 16 (0\%) \\ 
+	\hline
+	Redis & 55 & 58 & 55 & 59 (+7.27\%) \\ 
+	\hline
+	Xerces & 62 & 62 & 61 & 61 (-1.61\%) \\ 
+	\hline
+	Vim & 74 & 74 & 76 & 78 (+5.4\%) \\
+	\hline
+	OpenSSL & 152 & 152 & 153 & 153 (+0.66\%) \\ 
+	\hline
+	PostgreSQL & 323 & 323 & 327 & 331 (+2.48\%) \\ 
+	\hline
+	FFmpeg & 425 & 420 & 423 & 454 (+6.82\%) \\ 		
+	\hline
+\end{tabular}
+\caption{The number of bug reports produced by the analyzer.} \label{tab:reportnum}
+\end{table}
+The number of bug reports using the different loop modeling methods can be seen
+in Table \ref{tab:reportnum}. The increase in analysis coverage and in the number of 
+checked paths usually implies an increased number of found bugs, which indeed can be 
+observed on the numbers. However, it is important to note that the upsurge of the number 
+of explored execution paths described in Table \ref{tab:pathnum} considerably outweighs 
+the moderate rise in the number of bug reports.
+Since the loop widening method creates more new paths by discarding informations on the values of variables, it could introduce the risk of analyzing paths that lead to false positives.
+However, from the results it seems that this was not a problem in practice: relative to the increase in the number of analyzed paths, the number of reports hardly increased. Moreover, based on studying the environment of the found bugs, the ratio of false positive findings was low (beside some clear true positive) among the newly detected bugs.
+
+\subsection{Analysis time}
+
+\begin{table}[!htb]
+	\centering
+\begin{tabular}{ |c||c|c|c|c| } 
+	\hline
+	Project & Normal & Unroll & Widen & U + W \\
+	\hline \hline
+	TinyXML & 0:51 & 0:51 & 0:52 & 0:52 (+2\%) \\ 
+	\hline
+	Curl & 0:50 & 1:06 & 0:55 & 1:05 (+30\%) \\ 
+	\hline
+	Redis & 2:06 & 2:11 & 2:28 & 2:10 (+3\%) \\ 
+	\hline
+	Xerces & 3:38 & 3:34 & 3:37 & 3:39 (+0.5\%) \\ 
+	\hline
+	Vim & 3:11 & 3:26 & 3:18 & 3:27 (+3\%) \\
+	\hline
+	OpenSSL & 2:04 & 2:22 & 2:13 & 2:19 (+8.3\%) \\
+	\hline
+	PostgreSQL & 7:03 & 8:32 & 7:48 & 7:59 (+13\%) \\
+	\hline
+	FFmpeg & 9:40 & 10:22 & 10:14 & 11:20 (+17\%) \\
+	\hline
+\end{tabular}
+\caption{Average measured time of the analysis expressed in minutes. 
+(Average of 5 runs.)}\label{tab:time}
+\end{table} 
+The running time on different projects is showed in Table \ref{tab:time}.
+Although the widening method lead into more analyzed execution paths, the analysis time increase was more intense after enabling the unrolling process. This is possible due to the fact that unrolling leads to long paths where the \texttt{State} usually contains more information (constraints on variable values), which is very expensive in respect of running time. 
+In general there was only a minor increase in the analysis time at all examined projects which suggests a good scalability of the proposed improvements.

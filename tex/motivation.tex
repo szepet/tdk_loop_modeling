@@ -1,0 +1,71 @@
+
+\section{Motivation}
+Currently, the analyzer handles loops quite simply. More precisely, it unrolls 
+them 4 times by default and then cuts the analysis of the path where the loop 
+would have been unrolled more than 4 times. This behavior is reached by the 
+above presented basic block visiting budget (restriction no. 4).
+
+Loss in code coverage is one of the problems with this approach to loop
+modeling. Specifically, in cases where the loop is statically known to make 
+more than 4 steps, the analyzer do not analyze the code following the loop. 
+Thus, the naive loop handling (described above) could lead to entirely 
+unchecked code.
+Listing \ref{UnrollMot} shows a small example for that.
+
+\lstset{language=C,caption={Since the loop condition is known at every 
+		iteration, the analyzer will not check the 'rest of the function' 
+		part in the 
+		current state.},label=UnrollMot}
+\begin{lstlisting}
+void foo() {
+  int arr[6];
+  for (int i = 0; i < 6; i++) {
+    arr[i] = i;
+  }
+  /*rest of the function*/
+}\end{lstlisting}
+
+According to the budget rule concerning the basic block visit number, the
+analysis of the loop stops in the fourth iteration even if the loop 
+condition is simple enough to see that unrolling the whole loop would not be 
+too much extra work relatively. Running out of the budget implies (in this 
+case) that the rest of the function body remains unanalyzed, which may lead to 
+not finding potential bugs.
+Another problem can be seen on Listing \ref{WidenMot}:
+\lstset{language=C++,caption={The loop condition is unknown but the 
+analyzer 
+		will not generate a simulation path where n $\ge$ 4 (which can 
+		result coverage 
+		loss).},label=WidenMot}
+\begin{lstlisting}
+int num();
+void foo() {
+  int n = 0;
+  for (int i = 0; i < num(); ++i) {
+    ++n;
+  }
+  /*rest of the function, n < 4 */
+}\end{lstlisting}
+
+This code fragment results in an analysis which keeps track of the values of 
+\texttt{n} and \texttt{i} variables (this information is stored in the State). 
+In every iteration of the loop the values are updated accordingly. Note that 
+updating the
+State means that a new node is inserted into the \texttt{ExplodedGraph} with the 
+new 
+values. Since the body of the \texttt{num()} function is unknown, the 
+analyzer can not find out its return value. Thus it is considered as 
+unknown. This circumstance
+makes the graph to split into two branches. The first one belongs to the symbolic
+execution of the loop body assuming that the loop condition is true. The 
+other one simulates the case where the condition is false and the execution 
+continues after the loop. This process is done for every loop iteration, 
+however, at the 4th time, assuming the condition is true, the path will be cut 
+short according to the budget rule.
+Even though the analyzer generates paths to simulate the code after the loop 
+in the above described case, the value of variable \texttt{n} will be 
+always less than 4 on these paths and the rest of the function will only be 
+checked assuming this constraint. Since the analysis did not had any 
+precondition on the possible values of the variables, this constraint not 
+necessary correct. Most of the time this method results in coverage loss as 
+well, since the analyzer will ignore the paths where n is more than 4.

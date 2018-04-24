@@ -1,0 +1,67 @@
+
+\section{Introduction}
+During software development it is natural to make mistakes. Consequently,
+writing various test cases is required in order to validate the behavior
+of the program. In addition to the costs of test writing, it is possible that the developers fail
+to cover all possible critical cases. Furthermore, test writing and running
+often happens later than code development, but the costs of error correction
+increases proportionally to elapsed time  \cite{fixcost}. This proves that 
+testing alone is not necessarily sufficient to ensure code quality.  %Moreover,
+%there are specific properties of a software - e.g. coding convention following 
+%- which can not be checked by test cases.
+
+The static analysis tools offer a different approach for code validation 
+\cite{Zhivich2009} \cite{Bessey2010}, moreover, they can potentially check for 
+some characteristics of the code -- which cannot be verified by testing -- e.g. 
+the adherence to conventions.
+
+These tools are given the source code as input, using which they build a model 
+and make inferences based on that. The efficiency, accuracy, and runtime of the 
+analysis changes depending on the complexity of the model.
+The final output is a list of bug reports. However bugs are used quite 
+liberally here; they do not necessarily imply program malfunctions, as 
+optimisations or code convention nits are also included. Code chunks deemed 
+fragile or to have potential portability problems are listed too, so there can 
+be a wide variety of possible outputs.
+This document focuses on static analysis primarily as a method of uncovering 
+bugs.
+ 
+Unfortunately, it is impossible to detect every 
+bug only by using static analysis \cite{Rice:53}. Static analyzer tools might 
+not be able to discover some bugs (these are called false negatives) or report 
+correct code snippets as incorrect (false positives, see Fig \ref{fig:bes}). In 
+the industry the goal of these tools is to keep the ratio of the false positive 
+reports low while still be able to find real bugs.
+
+\begin{figure}[!h]
+	\begin{center}
+		\begin{tabular}{ | l | c | r | }
+			\hline
+			& True error   & Non-error \\ \hline
+			Reported error   & True Positive  & False Positive   \\ \hline
+			No error report & False Negative & True Negative    \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{The different types of the static analysis results.}
+	\label{fig:bes}
+\end{figure}
+
+Its important to note that another advantage of the static analyzer tools 
+(against test cases) that the analysis happens without executing the source 
+code, so it can be used without the running environment. Moreover, the code 
+coverage of the analysis does not depends on the already written test case set 
+and even can find bugs which is not covered by test cases e.g. unexpected 
+corner cases on the input variables. 
+
+The LLVM Clang Static Analyzer is a source code analysis tool which aims to 
+find bugs in C,
+C++, and Objective-C programs using - one of the most precise analysis methods 
+- symbolic execution  \cite{King1975} \cite{Hampapuram2005}, i.e. it simulates 
+the possible execution paths of the code. During symbolic execution, the 
+program is being interpreted, on a function-by-function basis, without any 
+knowledge about the runtime environment. It builds up and traverses an inner 
+model of the execution paths, called \texttt{ExplodedGraph}, for each analyzed 
+function. This method has exponential runtime and space complexity in the 
+number of branches.
+
