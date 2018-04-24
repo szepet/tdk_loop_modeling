@@ -245,32 +245,15 @@ of bindings as well.
 	\label{fig:exec_path}
 \end{figure}
 
+The analysis of the different execution paths can be done in any order, however, the evaluation of an expression (on a given path) must happen according to the language standard. 
+During the simulation of the expressions the analyzer models the state of the program, means that one expression/instruction will create a transition between two states. A symbolic state can be viewed as a set of concrete program states, moreover, a simulated path is basically ab analysis of these symbolic states in a well defined order. 
+
+In order to be able to perform this process efficiently, the analyzer creates an inner model of the execution paths, called ExplodedGraph \cite{explodedgraph}. The nodes of the ExplodedGraph (called ExplodedNodes) are pairs, containing a symbolic program state and a program point. The program point determines the code location where the symbolic execution is in the source text. The directed edge between ExplodedNodes determines the sequencing.
+
+Whenever the CSA encounters a branch in the symbolic execution, it creates new branches in the ExplodedGraph (see Fig \ref{fig:exploded_graph}). The paths from the root to the leaves represents the analyzed paths. This means, that the number of leaves in the ExplodedGraph (and so the size of the graph) is exponential with respect to the branches in the execution. That results us a complex, precise but resource consuming method.
 
 
-A végrehajtási útvonalak elemzése tetszőleges sorrendben történhet,
-viszont egy útvonalon belül a kifejezések kiértékelési sorrendje a nyelv
-szabályainak megfelelően történik.
-A kifejezések kiértékelése közben a program állapotait ábrázoljuk, egy kifejezés
-vagy utasítás eredménye egy átmenetet fog előidézni a program szimbolikus
-állapotai közt. Egy szimbolikus állapotot programállapotok halmazaként
-értelmezhetünk. Tehát egy útvonal az elemzés számára nem más, mint a program
-különböző szimbolikus állapotainak jól meghatározott sorrendben történő
-vizsgálata.
-
-Ennek érdekében, egy ezt a célt tökéletesen szolgáló modell, úgynevezett
-\textbf{Exploded Graph} \cite{explodedgraph} kerül felépítésre az elemzés alatt.
-Az Exploded Graph csúcsai párok, amik egy szimbolikus
-\textit{programállapotból} és egy \textit{programpontból} állnak.
-A programpont határozza meg azt, hogy a program mely pontján tart éppen az
-elemzés. Két csúcs közötti irányított él pedig a sorrendiséget határozza meg.
-
-Amennyiben egy elágazáshoz érünk a szimbolikus végrehajtás során, úgy az 
-Exploded Graph elágazik (lásd
-\ref{fig:exploded_graph}.ábra). Íly módon a rákövetkező csúcsok száma
-(és ebből következően a gráf mérete) az elemzés alatt - az elágazások számában -
-exponenciális mértékben nő.
-Ezen ok miatt egy komplex és precíz, ám időigényes módszerről beszélünk.
-
+The ExplodedGraph is a simple directed acyclic graph.
 Az Exploded Graph egy egyszerű körmentes irányított gráf. Amikor egy olyan 
 programpont és szimbolikus
 állapot párhoz jut el az elemzés, amit már korábban meglátogattunk, az elemzés
@@ -308,23 +291,18 @@ programállapotot (csúcsot) eredményeznek.
 	\label{fig:exploded_graph2}
 \end{figure}
 
-A modell tulajdonságai alapján kijelenthetjük, hogy a szimbolikus végrehajtás
-egy \textbf{útvonal érzékeny algoritmus}, vagyis bármely programállapotot elérve
-ismerjük az oda vezető teljes végrehajtási útvonalat. Ezáltal a hibák 
-megjelenítése
-során a hozzájuk tartozó útvonal is a kimenet részét képzi. Ez jelentős
-mértékben segít a hiba megértésében és csökkenti az annak kijavítására szánt
-időt.
+
+According to the properties of the model, it can be declared, that the symbolic execution is a path sensitive algorithm, i.e. reaching any program state the CSA knows the whole path leading to the simulated point. Thereby the displaying of the bugs shows not only the location of the bug but the corresponding execution path as well. This productively helps the programmer to understand the problem more easily, even spending less time on fixing the bug.
 
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=1\textwidth]{img/view}
-	\caption{A CSA által talált hiba megtekintése HTML formátumban.}
+	\caption{A bug found by the Clang Static Analyzer can be represented in HTML format to make it more clear and understandable.}
 	\label{fig:hibak_megjelenitese}
 \end{figure}
 
-\subsection{Implementációs részletek}
-\subsubsection{Az elemzés folyamata}
+\subsection{Implementation details}
+\subsubsection{The process of the analysis}
 Egy fordítási egység elemzése során az azt alkotó függvények kerülnek
 szimulálásra. Tehát a felépített modell is egy függvényhez tartozik,
 annak végrehajtása során előforduló programállapotok alkotják az Exploded 
@@ -405,11 +383,7 @@ elemzést.
 	\label{fig:bejaras_szemleltetes}
 \end{figure}
 
-Mindezeken túlmenően a memóriahasználat csökkentése céljából bizonyos
-időközönként a jelenleg memóriában tartott \textit{fölösleges} csúcsok
-eltávolításra kerülnek. Ez elsősorban a CSA által létrehozott, annak belső
-müködését segítő, de a program futása során konkrétan nem megjelenő
-állapotokat érinti.
+Moreover, in order to use less memory during the analysis, the CSA clears the ExplodedNodes which are unnecessarily kept in the memory. This mainly means, the nodes that are created to help the analysis but not representing concrete state changes in the actual running of the program.
 
 %%%%
 An important technical note is that the building 
