@@ -14,7 +14,7 @@ The Clang Static Analyzer (CSA) -- as it is indicated by its name -- build
 around the Clang compiler. It is one of the most quickly developing open source 
 static analysis tool. In this section the principles and the relevant 
 implementation details of the CSA will be presented.
-%%%
+
 \subsection{Symbolic execution}
 The CSA uses the symbolic execution static analysis algorithm which means it 
 simulates the possible execution paths and tries make conclusions. It basically 
@@ -105,7 +105,8 @@ the problem more easily, even spending less time on fixing the bug.
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=1\textwidth]{img/view}
-	\caption{A bug found by the Clang Static Analyzer can be represented in HTML format to make it more clear and understandable.}
+	\caption{A bug found by the Clang Static Analyzer can be represented in 
+	HTML format to make it more clear and easier to understand.}
 	\label{fig:hibak_megjelenitese}
 \end{figure}
 
@@ -113,12 +114,29 @@ the problem more easily, even spending less time on fixing the bug.
 \subsubsection{The process of the analysis}
 The CSA works on a translation unit, analyzing its content function by function. So the the inner model is constructed for an analysis of a function and its states are represented in the ExplodedGraph.
 
-Whenever -- during the simulation of a given path -- the CSA encounters a branch in the execution, it splits the states creating more children for the actually simulated ExplodedNode, and so constructs new paths to analyze. Moreover, the condition which caused the branching is stored and the assumption whether it is true or false as well. This can potentially results in restriction on the symbolic values, and so we collect information which help us on the upcoming decisions.
+Whenever -- during the simulation of a given path -- the CSA encounters a 
+branch in the execution, it splits the states creating more children for the 
+actually simulated ExplodedNode, and so constructs new paths to analyze. 
+Moreover, the condition which caused the branching is stored and the assumption 
+whether it is true or false as well. This can potentially results in 
+restriction on the symbolic values, and so we collect information which help us 
+on the upcoming decisions. 
 
 It is possible that the simulation encounters a call of an other function.
-At this point the called function will be evaluated/analyzed on the spot of the call, knowing the calling context. This allows us to make a more precise analysis of the called function, since we potentially have information on the possible values of its arguments. The analysis of a function while knowing the calling context is called an \textit{inline} analysis. The other possibility -- when we have absolutely no information or precondition on the values of a function and it is analyzed so -- is called an \textit{top level} analysis. 
+At this point the called function will be evaluated/analyzed on the spot of the 
+call, knowing the calling context. This allows us to make a more precise 
+analysis of the called function, since we potentially have information on the 
+possible values of its arguments. The analysis of a function while knowing the 
+calling context is called an \textit{inline} analysis. The other possibility -- 
+when we have absolutely no information or precondition on the values of a 
+function and it is analyzed so -- is called an \textit{top level} analysis.
 
-In order to decrease the rate of false positive reports and make the analysis more time efficient, the CSA will not reanalyze a function as top level if it was already analyzed as an inline function. The analyzer tries to inline as much function as possible. This is reached by creating the function call graph of the translation unit and the analysis order of the functions is determined by a post-traversal-walk TODO on this call graph.
+In order to decrease the rate of false positive reports and make the analysis 
+more time efficient, the CSA will not reanalyze a function as top level if it 
+was already analyzed as an inline function. The analyzer tries to inline as 
+much function as possible. This is reached by creating the function call graph 
+of the translation unit and the analysis order of the functions is determined 
+by a post-traversal-walk TODO on this call graph.
 
 As it was mentioned earlier, branches in the execution lead to an exponential number of \texttt{ExplodedNode}s.
 This combinatorial explosion is handled in the Static Analyzer by restricting or even stopping
@@ -154,43 +172,38 @@ limitations. This will always be distinguishable from the context.
 
 \subsubsection{The building process of the model}
 The syntactic and semantic information of variables, functions and types
-are required to perform the above described simulation.
-A szimulációhoz szükséges a különböző változók, függvények, típusok 
-szintaktikus és szemantikus tulajdonságainak ismerete.
-Ezen információk a C/C++ forrásfájlok esetén a fordítás során is szükségesek.
-A fordítók ezeket egy saját, jól struktúrált adatszerkezetben tárolják, egy 
-absztrakt szintaxisfát építenek fel a kód elemzése során.
-A gyakorlatban ez konkrét (adott platformra jellemző) információkat, illetve a 
-szemantikus tulajdonságokat is tartalmazza.
-Sőt, számos fordító esetében kör is előfordulhat benne. Ilyenkor csupán csak 
-történeti okokból hívják az adott adatszerkezetet fának.
-A felsorolt tulajdonságok alapján ez az adatszerkezet a szimbolikus végrehajtás 
-számára nélkülözhetetlen információkat tartalmaz. 
-Ebben rejlik a fő motivációja annak, hogy egy statikus elemző rendszert egy 
-fordító köré építsünk,
-amely képes az alapvetően szükséges információk strukturált előállítására. 
-Fontos még, hogy az adatszerkezetben
-tárolt információk helyessége jól tesztelt, hiszen minden fordítás során a 
-kódgeneráláskor ugyanezek az
-információk lesznek felhasználva. A CSA a Clang fordító által épített 
-szintaxisfát használja.
+are essential to perform the above described simulation. These informations 
+required for the compilation process as well. The compilers store them in a 
+data structure specially designed for this task, called abstract syntax tree 
+(AST). In practice it usually contains concrete (platform specific) 
+informations, and semantic properties as well, moreover, in some cases, circles 
+can occur. Mainly we call it AST only because of historical reasons. 
+However, the listed properties shows that having a structure like this is 
+essential for the symbolic execution. That is the main motivation for building 
+a static analysis tool around a compiler. An important note, that these 
+structure must be well tested on a compiler since it is used for code 
+generation. The CSA uses the AST build by the Clang compiler.
 
-Ezek után már elegendő információ áll rendelkezésre az elemző rendszer számára,
-hogy (pár köztes lépésen keresztül) képes legyen felépíteni a szimulálás során 
-létrejövő Exploded Graphot.
+From the AST we are able to build an inner model, called \texttt{Control Flow 
+Graph} (CFG). The \texttt{CFG} represents a source-level, intra-procedural 
+control flow of a statement. This statement can potentially be an entire 
+function body, or just a single expression. The \texttt{CFG} consists of 
+\texttt{CFGBlocks} which are simply containers of statements. The 
+\texttt{CFGBlocks}s essentially represent the basic blocks of the code but can 
+contain some extra custom information. 
+Although basic blocks and \texttt{CFGBlocks} are technically different, in the 
+rest of the article the term basic blocks will be used for \texttt{CFGBlocks} 
+as well for the sake of easier understanding and better illustration.
 
-Az elemzés során használt modellt (az Exploded Graphot) a CSA egy
-optimalizált \textit{mélységi bejárás} segítségével építi fel és járja be 
-egyszerre.
-Ennek fő oka, hogy a mélységi bejáráshoz elegendő csak az adott útvonalhoz
-tartozó csúcsok memóriában tartása. Ezzel szemben egy szélességi bejárás során
-az összes elemzett útvonalat a memóriában kell tartanunk az útvonalérzékenység
-megtartása érdekében. Továbbá a mélységi bejárás esetén kevesebb kontextus 
-váltásra van
-szükség: az adott útvonal elemzése során kevés memóriarégió és szimbólum kerül
-felhasználásra, nagyobb eséllyel találhatóak meg a felhasznált adatszerkezetek a
-processzor gyorsítótárában, így hatékonyabban tudjuk végrehajtani az 
-elemzést.
+Thus based on the CFG of the functions an \texttt{ExplodedGraph} can be built.
+
+The inner model of the execution paths is created and traversed simultaneously 
+by an optimized depth first search. The main reason for the depth first search 
+is that it allows us to memory efficiently simulate the paths, since we must 
+keep the currently analyzed path in memory (in order to be able to report it as 
+well). Moreover, a depth first search requires less context change than a 
+breath first search which help the analysis to more efficiently cache the 
+investigated symbolic values and memory regions for a given path.
 
 \begin{figure}[h]
 	\centering
@@ -204,25 +217,4 @@ elemzést.
 Moreover, in order to use less memory during the analysis, the CSA clears the ExplodedNodes which are unnecessarily kept in the memory. This mainly means, the nodes that are created to help the analysis but not representing concrete state changes in the actual running of the program.
 
 %%%%
-An important technical note is that the building 
-of the \texttt{ExplodedGraph} is based on the \texttt{Control Flow Graph} 
-(\texttt{CFG}) of the functions. The \texttt{CFG} represents a source-level, 
-intra-procedural control flow of a 
-statement. This statement can potentially be an entire function body, or just a 
-single expression. The \texttt{CFG} consists of \texttt{CFGBlocks} which are 
-simply containers of statements. The \texttt{CFGBlocks}s essentially represent 
-the basic blocks of the code but can contain some extra custom information. 
-Although basic blocks and \texttt{CFGBlocks} are technically different, in the 
-rest of the article the term basic blocks will be used for \texttt{CFGBlocks} 
-as well for the sake of easier understanding and better illustration.
-
-Thus during the analysis -- based on the function CFGs -- an 
-\texttt{ExplodedGraph} is built up. A 
-node of this graph (called \texttt{ExplodedNode}) contains a 
-\texttt{ProgramPoint} (which determines the location) and a \texttt{State} 
-(which contains any known information at that point). Its paths from the root 
-to the leaves are modeling the different execution paths of the analyzed 
-function. Whenever the execution encounters a branch, a corresponding branch 
-will be created in the \texttt{ExplodedGraph} during the simulated 
-interpretation.
 

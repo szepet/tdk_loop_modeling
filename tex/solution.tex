@@ -27,6 +27,14 @@ void foo() {
   int l = 2/k; // Division by zero
 }\end{lstlisting}
 
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.3]{img/elte-cimer}
+	\caption{The corresponding ExplodedGraph to the function presented on 
+		Listing \ref{WidenMot}.}
+	\label{fig:eg_mot_1}
+\end{figure}
+
 In the current solution a loop has to fulfill the following conditions in order 
 to be unrolled:
 \begin{enumerate}  
@@ -82,6 +90,14 @@ into a division by zero error. Since this execution path would never be
 performed while running the analyzed program, it is considered a false positive. My aim 
 was to give a more precise approach for widening. There was already conversation within the community about some possible enhancements \cite{Widening}.
 
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.3]{img/elte-cimer}
+	\caption{The corresponding ExplodedGraph to the function presented on 
+		Listing \ref{WidenMot}.}
+	\label{fig:eg_mot_1}
+\end{figure}
+
 One of the main principles is that the analysis should still continue after the block 
 visiting budget is exhausted and the information of only those variables should be invalidated which are possibly modified by the loop, e.g. a statement, like \texttt{arr[i] = i} where \texttt{i} is the loop variable, means that we discard the data on the whole \texttt{arr} array but nothing else).
 For this I developed a solution which checks every possible way in which a 
@@ -132,6 +148,14 @@ void foo() {
   /*rest of the function, n <= 1 */
 }\end{lstlisting}
 
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.3]{img/elte-cimer}
+	\caption{The corresponding ExplodedGraph to the function presented on 
+		Listing \ref{WidenMot}.}
+	\label{fig:eg_mot_1}
+\end{figure}
+
 In this scenario, when the analyzer first step into the outer loop (so it assumes
 that \texttt{i < num()} is true) and encounter the inner loop, it consumes
 its (own) block visiting budget. (This implies that it will be widened, although
@@ -175,6 +199,14 @@ void foo() {
   int n = 1 / (7 - k);
          // ^ Possible division by zero
 }\end{lstlisting}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.3]{img/elte-cimer}
+	\caption{The corresponding ExplodedGraph to the function presented on 
+		Listing \ref{WidenMot}.}
+	\label{fig:eg_mot_1}
+\end{figure}
 This way the analyzer will produce a path where the value of \texttt{i} is 
 known
 to be 7, so it will be able find the possible division by zero error.

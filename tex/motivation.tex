@@ -25,6 +25,14 @@ void foo() {
   /*rest of the function*/
 }\end{lstlisting}
 
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.3]{img/elte-cimer}
+	\caption{The corresponding ExplodedGraph to the function presented on 
+		Listing \ref{WidenMot}.}
+	\label{fig:eg_mot_0}
+\end{figure}
+
 According to the budget rule concerning the basic block visit number, the
 analysis of the loop stops in the fourth iteration even if the loop 
 condition is simple enough to see that unrolling the whole loop would not be 
@@ -46,6 +54,14 @@ void foo() {
   }
   /*rest of the function, n < 4 */
 }\end{lstlisting}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.3]{img/elte-cimer}
+	\caption{The corresponding ExplodedGraph to the function presented on 
+	Listing \ref{WidenMot}.}
+	\label{fig:eg_mot_1}
+\end{figure}
 
 This code fragment results in an analysis which keeps track of the values of 
 \texttt{n} and \texttt{i} variables (this information is stored in the State). 
