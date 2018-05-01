@@ -3,7 +3,7 @@
 \emph{Clang} is an open-source compiler, which is based on the \emph{LLVM} 
 project \cite{lattner:clang}. This is a quickly improving project, 
 supported by various companies including e.g. Google, Apple, Samsung, Ericsson, 
-etc. Moreover it is becoming more and more popular in the circle of compilers. 
+etc.
 Since Clang is built outstandingly modular, it is not simply a compiler but a 
 complete framework for creating developer tools on C/C++/Objective-C 
 languages. Its API is well documented and the software is well tested due to 
@@ -52,7 +52,7 @@ moreover, a simulated path is basically an analysis of these symbolic states in
 a well defined order. 
 
 In order to be able to perform this process efficiently, the analyzer creates 
-an inner model of the execution paths, called ExplodedGraph 
+an internal model of the execution paths, called ExplodedGraph 
 \cite{explodedgraph}. The nodes of the ExplodedGraph (called ExplodedNodes) are 
 pairs, containing a symbolic program state and a program point. The program 
 point determines the code location where the symbolic execution is in the 
@@ -112,7 +112,9 @@ the problem more easily, even spending less time on fixing the bug.
 
 \subsection{Implementation details}
 \subsubsection{The process of the analysis}
-The CSA works on a translation unit, analyzing its content function by function. So the the inner model is constructed for an analysis of a function and its states are represented in the ExplodedGraph.
+The CSA works on a translation unit, analyzing its content function by 
+function. So the the internal model is constructed for an analysis of a 
+function and its states are represented in the ExplodedGraph.
 
 Whenever -- during the simulation of a given path -- the CSA encounters a 
 branch in the execution, it splits the states creating more children for the 
@@ -163,7 +165,9 @@ These limitations include:
 	function will not be inlined again in this \texttt{ExplodedGraph}.
 	\item The number of times a basic block is processed during the 
 	analysis. This	constraint limits the number of loop iterations. When this 
-	threshold is reached the currently analyzed execution path is aborted.
+	threshold is reached the currently analyzed execution path is aborted. 
+	(Note: only the simulation of that given path is stopped not the whole 
+	analysis.)
 \end{enumerate}
 
 The budget expression can be used in two ways. Sometimes it means the
@@ -184,7 +188,8 @@ a static analysis tool around a compiler. An important note, that these
 structure must be well tested on a compiler since it is used for code 
 generation. The CSA uses the AST build by the Clang compiler.
 
-From the AST we are able to build an inner model, called \texttt{Control Flow 
+From the AST we are able to build an internal model, called \texttt{Control 
+Flow 
 Graph} (CFG). The \texttt{CFG} represents a source-level, intra-procedural 
 control flow of a statement. This statement can potentially be an entire 
 function body, or just a single expression. The \texttt{CFG} consists of 
@@ -197,7 +202,8 @@ as well for the sake of easier understanding and better illustration.
 
 Thus based on the CFG of the functions an \texttt{ExplodedGraph} can be built.
 
-The inner model of the execution paths is created and traversed simultaneously 
+The internal model of the execution paths is created and traversed 
+simultaneously 
 by an optimized depth first search. The main reason for the depth first search 
 is that it allows us to memory efficiently simulate the paths, since we must 
 keep the currently analyzed path in memory (in order to be able to report it as 

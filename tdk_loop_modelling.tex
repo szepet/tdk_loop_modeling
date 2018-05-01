@@ -102,31 +102,11 @@ title=\lstname                   % show the filename of files included with
 \include{tex/motivation}
 \include{tex/solution}
 \include{tex/evaluation}
-\include{tex/conclusion}
 \include{tex/future}
+\include{tex/conclusion}
 \include{tex/acknowledgement}
 
 % tartalom
-\begin{abstract}
-The LLVM Clang Static Analyzer is a source code analysis tool which aims to 
-find bugs in C,
-C++, and Objective-C programs using symbolic execution, i.e. it simulates the
-possible execution paths of the code. Currently the simulation of the loops is
-somewhat naive (but efficient), unrolling the loops a predefined constant 
-number of times. However, this approach can result in a loss of coverage in 
-various cases.
-
-This study aims to introduce two alternative approaches which can 
-extend the current method and can be applied simultaneously: 
-\begin{enumerate*} [label={(\arabic*)}, noitemsep]
-	\item determining loops worth to fully unroll with applied heuristics, and
-	\item using a widening mechanism to simulate an arbitrary number of 
-	iteration steps.
-\end{enumerate*}
-These methods were evaluated on numerous open source projects, and 
-proved to increase coverage in most of the cases. This work also laid the
-infrastructure for future loop modeling improvements.
-\end{abstract}
 
 % 2012 ACM Computing Classification System (CSS) concepts
 % Generate at 'http://dl.acm.org/ccs/ccs.cfm'.

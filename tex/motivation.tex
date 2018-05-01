@@ -1,6 +1,6 @@
 
-\section{Motivation}
-Currently, the analyzer handles loops quite simply. More precisely, it unrolls 
+\section{Limitations on loop execution}
+Currently, the analyzer handles loops quite naively. More precisely, it unrolls 
 them 4 times by default and then cuts the analysis of the path where the loop 
 would have been unrolled more than 4 times. This behavior is reached by the 
 above presented basic block visiting budget (restriction no. 4).
